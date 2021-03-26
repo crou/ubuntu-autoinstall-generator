@@ -1,0 +1,138 @@
+#cloud-config
+autoinstall:
+  version: 1
+  identity:
+    hostname: ubuntu
+    password: "$6$exDY1mhS4KUYCE/2$zmn9ToZwTKLhCw.b4/b.ZRTIZM30JZ4QrOQ2aOXJ8yk96xpcCof0kxKwuX1kqLG/ygbJ1f8wxED22bTL4F46P0"
+    username: ubuntu
+  storage:
+    config:
+      - id: disk-system
+        type: disk
+        match:
+          size: largest
+        ptable: gpt
+        wipe: superblock
+        name: system
+        preserve: false
+
+      ## EFI partition:
+      - id: part-efi
+        type: partition
+        device: disk-system
+        number: 1
+        size: 1G
+        wipe: superblock
+        flag: boot
+        grub_device: true
+      - id: format-efi
+        type: format
+        volume: part-efi
+        fstype: fat32
+        label: efi
+      - id: mount-efi
+        type: mount
+        device: format-efi
+        path: /boot/efi        
+      ## Boot partition:
+      - id: part-boot
+        type: partition
+        device: disk-system
+        number: 2
+        size: 1G
+      - id: format-boot
+        type: format
+        volume: part-boot
+        fstype: ext4
+        label: boot
+      - id: mount-boot
+        type: mount
+        device: format-boot
+        path: /boot
+        # options: "defaults,relatime,compress=lzo,ssd,discard,space_cache,autodefrag"
+
+      ## Main partition to encrypt
+      - id: part-main
+        type: partition
+        device: disk-system
+        number: 3
+        size: -1  # take the rest of the disk
+      - id: crypt-main
+        type: dm_crypt
+        volume: part-main
+        dm_name: crypt-main
+        key: 'changeme' # <<<=== dm crypt key is here! Must change it after installation
+      - id: vol-main
+        type: lvm_volgroup
+        name: vol-main
+        devices:
+          - crypt-main
+      
+      ## Swap 
+      - id: lvm-part-swap
+        type: lvm_partition
+        name: swap
+        volgroup: vol-main
+        size: 32G  # <<<=== Reserve 32GB for swap
+      - id: format-swap
+        type: format
+        volume: lvm-part-swap
+        fstype: swap
+        label: swap
+      - id: mount-swap
+        type: swap
+        device: format-swap
+        path: none
+
+      ## Root partition        
+      - id: lvm-part-root
+        type: lvm_partition
+        name: root
+        volgroup: vol-main
+        size: 80G  # <<<=== Allocate between 20G and 80G for the / Root partition
+
+      ## Home partition        
+      - id: lvm-part-home
+        type: lvm_partition
+        name: home
+        volgroup: vol-main
+        size: -1  # <<<=== Allocate the remaining disk space for the /home
+
+
+     ## Format root 
+      - id: format-root
+        type: format
+        volume: lvm-part-root
+        fstype: ext4
+        label: root
+      - id: mount-root
+        type: mount
+        device: format-root
+        path: /
+        #options: "defaults,relatime,compress=lzo,ssd,discard,space_cache,autodefrag"
+
+      # format Home
+      - id: format-home
+        type: format
+        volume: lvm-part-home
+        fstype: ext4
+        label: home
+      - id: mount-home
+        type: mount
+        device: format-home
+        path: /home
+        #options: "defaults,relatime,compress=lzo,ssd,discard,space_cache,autodefrag"
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+  ssh:
+    allow-pw: true
+    install-server: false
+  packages:
+    - build-essential
+    - wget
+    - ubuntu-desktop-minimal
+    - ubuntu-restricted-extras
+  late-commands:
+    - sed -ie 's/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="splash"/' /target/etc/default/grub  
+    - curtin in-target --target /target update-grub2
