@@ -216,7 +216,7 @@ log "👍 Updated hashes."
 
 log "📦 Repackaging extracted files into an ISO image..."
 cd "$tmpdir"
-mkisofs -quiet -D -r -V "ubuntu-autoinstall-$today" -cache-inodes -J -l -joliet-long -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e boot/grub/efi.img -no-emul-boot -o "${destination_iso}" .
+xorriso -as mkisofs -r -V "ubuntu-autoinstall-$today" -cache-inodes -J -l -joliet-long -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e boot/grub/efi.img -no-emul-boot -o "${destination_iso}" .
 cd "$OLDPWD"
 log "👍 Repackaged into ${destination_iso}"
 
